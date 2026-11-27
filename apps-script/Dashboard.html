@@ -10,11 +10,15 @@
         --surface-1: #ffffff;
         --border: #e3e5e8;
         --grid: #eef0f2;
+        --axis: #c9ccd1;
         --text-primary: #191919;
         --text-secondary: #666666;
         --series-1: #257de0;
+        --series-2: #f47230;
+        --good: #006c10;
+        --critical: #dc3c3d;
         --hover: #f2f6fc;
-        --error: #c5221f;
+        --banner: #eef4fd;
       }
       @media (prefers-color-scheme: dark) {
         :root:where(:not([data-theme="light"])) {
@@ -23,11 +27,15 @@
           --surface-1: #191919;
           --border: #2c2c2c;
           --grid: #242424;
+          --axis: #3a3a3a;
           --text-primary: #efefef;
           --text-secondary: #9c9c9c;
           --series-1: #338ced;
+          --series-2: #e76624;
+          --good: #0aac23;
+          --critical: #eb6263;
           --hover: #1f2630;
-          --error: #f28b82;
+          --banner: #18212d;
         }
       }
       :root[data-theme="dark"] {
@@ -36,11 +44,15 @@
         --surface-1: #191919;
         --border: #2c2c2c;
         --grid: #242424;
+        --axis: #3a3a3a;
         --text-primary: #efefef;
         --text-secondary: #9c9c9c;
         --series-1: #338ced;
+        --series-2: #e76624;
+        --good: #0aac23;
+        --critical: #eb6263;
         --hover: #1f2630;
-        --error: #f28b82;
+        --banner: #18212d;
       }
 
       * { box-sizing: border-box; }
@@ -54,10 +66,7 @@
       h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
       .sub { color: var(--text-secondary); margin: 0 0 20px; }
 
-      .filters {
-        display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
-        margin-bottom: 20px;
-      }
+      .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
       .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
       .filters input, .filters select {
         height: 34px; padding: 0 8px; min-width: 150px;
@@ -69,14 +78,47 @@
         border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
       }
 
-      .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+      .banner {
+        background: var(--banner); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;
+        font-size: 13px; color: var(--text-primary);
+      }
+      .banner.muted { background: transparent; border: 1px dashed var(--border); color: var(--text-secondary); }
+
+      .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
       .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
       .kpi .label { font-size: 12px; color: var(--text-secondary); }
       .kpi .value { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+      .kpi .delta { font-size: 12px; margin-top: 4px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
-      .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-      .card h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
+      .up { color: var(--good); font-weight: 600; }
+      .down { color: var(--critical); font-weight: 600; }
+      .flat { color: var(--text-secondary); }
 
+      .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+      .card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+      .card h2 { font-size: 15px; margin: 0; font-weight: 600; }
+
+      .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-secondary); }
+      .legend .key { display: inline-flex; align-items: center; gap: 6px; }
+      .swatch-bar { width: 12px; height: 10px; border-radius: 2px; background: var(--series-1); }
+      .swatch-tick { width: 3px; height: 14px; border-radius: 1px; background: var(--series-2); }
+      .swatch-line { width: 16px; height: 2px; border-radius: 1px; }
+
+      /* Trend chart */
+      .chart { position: relative; }
+      .chart svg { display: block; width: 100%; height: 260px; overflow: visible; }
+      .chart text { font-size: 11px; fill: var(--text-secondary); font-variant-numeric: tabular-nums; }
+      .tooltip {
+        position: absolute; pointer-events: none; display: none; z-index: 2;
+        background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+        padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); min-width: 160px;
+        font-variant-numeric: tabular-nums;
+      }
+      .tooltip .t-title { font-weight: 600; margin-bottom: 4px; }
+      .tooltip .t-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+      .tooltip .t-name { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+
+      /* Branch table */
       table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
       th {
         text-align: left; font-size: 12px; font-weight: 500; color: var(--text-secondary);
@@ -86,30 +128,35 @@
       td { padding: 5px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
       tbody tr:hover { background: var(--hover); }
       td.rank { color: var(--text-secondary); width: 32px; }
-      td.branch { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-      td.barcell { width: 45%; min-width: 120px; }
-      /* Track = lebar sel dikurangi ruang label, supaya panjang bar proporsional
-         dan label nilai selalu muat di ujung bar. */
-      .bar { display: flex; align-items: center; gap: 8px; width: calc(100% - 80px); }
-      .bar span.fill {
+      td.branch { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+      td.barcell { width: 38%; min-width: 140px; }
+      .bar { position: relative; display: flex; align-items: center; gap: 8px; width: calc(100% - 80px); height: 20px; }
+      .bar .fill {
         flex: none; display: block; height: 16px; background: var(--series-1);
         border-radius: 0 4px 4px 0; min-width: 2px;
       }
-      .bar span.val { flex: none; color: var(--text-primary); font-size: 13px; }
+      .bar .tick {
+        position: absolute; top: 0; width: 3px; height: 20px; margin-left: -1px;
+        background: var(--series-2); border-radius: 1px; box-shadow: 0 0 0 1px var(--surface-1);
+      }
+      .bar .val { position: absolute; top: 50%; transform: translateY(-50%); color: var(--text-primary); font-size: 13px; white-space: nowrap; }
       tfoot td { font-weight: 600; border-top: 1px solid var(--border); border-bottom: 0; }
 
       .status { color: var(--text-secondary); padding: 24px 0; text-align: center; }
-      .status.error { color: var(--error); white-space: pre-wrap; }
+      .status.error { color: var(--critical); white-space: pre-wrap; }
       .meta { color: var(--text-secondary); font-size: 12px; margin-top: 10px; }
 
-      @media (max-width: 700px) {
+      @media (max-width: 760px) {
         .kpis { grid-template-columns: 1fr; }
         .filters label, .filters input, .filters select { width: 100%; }
         .table-scroll { overflow-x: auto; }
         th.hide-sm, td.hide-sm { display: none; }
         th, td { padding-left: 4px; padding-right: 4px; }
-        td.branch { white-space: normal; max-width: 110px; }
-        td.barcell { min-width: 140px; }
+        td.branch { white-space: normal; max-width: 96px; font-size: 13px; }
+        td.barcell { min-width: 104px; }
+        .bar { width: calc(100% - 58px); }
+        .bar .val { font-size: 12px; }
+        th.rank, td.rank { display: none; }
         tfoot td { white-space: normal; }
       }
     </style>
@@ -120,21 +167,34 @@
       <p class="sub">Sumber: sheet <b>[Use] Raw Txn</b>, dikelompokkan berdasarkan kolom Cluster.</p>
 
       <div class="filters">
+        <label>Academic Year <select id="academicYear"><option value="">Semua</option></select></label>
         <label>Dari tanggal <input type="date" id="from"></label>
         <label>Sampai tanggal <input type="date" id="to"></label>
-        <label>Academic Year <select id="academicYear"><option value="">Semua</option></select></label>
         <label>New Product Type <select id="productType"><option value="">Semua</option></select></label>
         <button id="reset" type="button">Reset</button>
       </div>
 
+      <div id="banner"></div>
+
       <div class="kpis">
-        <div class="kpi"><div class="label">Total Revenue</div><div class="value" id="kpiRevenue">–</div></div>
-        <div class="kpi"><div class="label">Jumlah Transaksi</div><div class="value" id="kpiTxn">–</div></div>
-        <div class="kpi"><div class="label">Jumlah Branch</div><div class="value" id="kpiBranches">–</div></div>
+        <div class="kpi"><div class="label">Total Revenue</div><div class="value" id="kpiRevenue">–</div><div class="delta" id="kpiRevenueDelta"></div></div>
+        <div class="kpi"><div class="label">Jumlah Transaksi</div><div class="value" id="kpiTxn">–</div><div class="delta" id="kpiTxnDelta"></div></div>
+        <div class="kpi"><div class="label">Jumlah Branch</div><div class="value" id="kpiBranches">–</div><div class="delta" id="kpiBranchesNote"></div></div>
       </div>
 
       <div class="card">
-        <h2>Revenue per branch, urut dari terbesar</h2>
+        <div class="card-head">
+          <h2>Tren revenue bulanan</h2>
+          <div class="legend" id="trendLegend"></div>
+        </div>
+        <div class="chart" id="trend"><div class="status">Memuat data…</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Revenue per branch, urut dari terbesar</h2>
+          <div class="legend" id="tableLegend"></div>
+        </div>
         <div id="content"><div class="status">Memuat data…</div></div>
         <div class="meta" id="meta"></div>
       </div>
@@ -143,16 +203,36 @@
     <script>
       var fmtRp = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
       var fmtCompact = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 2 });
+      var fmtAxis = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 });
       var fmtInt = new Intl.NumberFormat('id-ID');
       var fmtPct = new Intl.NumberFormat('id-ID', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      var MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
       var optionsLoaded = false;
       var requestSeq = 0;
+      var lastData = null;
 
       function el(id) { return document.getElementById(id); }
       function esc(s) {
         return String(s).replace(/[&<>"']/g, function (c) {
           return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
         });
+      }
+      function fmtDate(iso) {
+        if (!iso) return '';
+        return Number(iso.substring(8, 10)) + ' ' + MONTHS_ID[Number(iso.substring(5, 7)) - 1] + ' ' + iso.substring(0, 4);
+      }
+      function rpShort(n) { return 'Rp ' + fmtCompact.format(n); }
+
+      /** Growth sebagai HTML: panah + persen. Warna hanya pendukung, panah & tanda +/- membawa makna. */
+      function growthHtml(cur, prev) {
+        if (!prev && !cur) return '<span class="flat">–</span>';
+        if (!prev) return '<span class="up">▲ Baru</span>';
+        var g = (cur - prev) / prev;
+        if (Math.abs(g) < 0.0005) return '<span class="flat">● 0,0%</span>';
+        var cls = g > 0 ? 'up' : 'down';
+        var arrow = g > 0 ? '▲' : '▼';
+        var sign = g > 0 ? '+' : '−';
+        return '<span class="' + cls + '">' + arrow + ' ' + sign + fmtPct.format(Math.abs(g)) + '</span>';
       }
 
       function currentFilters() {
@@ -171,7 +251,9 @@
           .withSuccessHandler(function (data) { if (seq === requestSeq) render(data); })
           .withFailureHandler(function (err) {
             if (seq !== requestSeq) return;
-            el('content').innerHTML = '<div class="status error">' + esc((err && err.message) || err) + '</div>';
+            var msg = '<div class="status error">' + esc((err && err.message) || err) + '</div>';
+            el('content').innerHTML = msg;
+            el('trend').innerHTML = '';
           })
           .getDashboardData(currentFilters());
       }
@@ -186,6 +268,7 @@
       }
 
       function render(data) {
+        lastData = data;
         if (!optionsLoaded) {
           fillSelect('academicYear', data.options.academicYears);
           fillSelect('productType', data.options.productTypes);
@@ -195,45 +278,216 @@
           });
           optionsLoaded = true;
         }
+        var cmp = data.comparison;
+        var on = cmp.enabled;
 
-        el('kpiRevenue').textContent = 'Rp ' + fmtCompact.format(data.totals.revenue);
-        el('kpiRevenue').title = fmtRp.format(data.totals.revenue);
-        el('kpiTxn').textContent = fmtInt.format(data.totals.txn);
-        el('kpiBranches').textContent = fmtInt.format(data.totals.branches);
+        // Banner periode
+        if (on) {
+          var curPeriod = (cmp.from ? fmtDate(cmp.from) + ' – ' : 's/d ') + fmtDate(cmp.to) +
+            (cmp.toIsLatestData ? ' (data terakhir)' : '');
+          var prevPeriod = (cmp.prevFrom ? fmtDate(cmp.prevFrom) + ' – ' : 's/d ') + fmtDate(cmp.prevTo);
+          el('banner').className = 'banner';
+          el('banner').innerHTML = 'Membandingkan <b>' + esc(cmp.academicYear) + '</b> ' + esc(curPeriod) +
+            ' dengan <b>' + esc(cmp.prevAcademicYear) + '</b> ' + esc(prevPeriod) + '.';
+        } else {
+          el('banner').className = 'banner muted';
+          el('banner').textContent = cmp.reason || '';
+        }
+
+        // KPI
+        var t = data.totals;
+        el('kpiRevenue').textContent = rpShort(t.revenue);
+        el('kpiRevenue').title = fmtRp.format(t.revenue);
+        el('kpiTxn').textContent = fmtInt.format(t.txn);
+        el('kpiBranches').textContent = fmtInt.format(t.branches);
+        if (on) {
+          el('kpiRevenueDelta').innerHTML = growthHtml(t.revenue, t.prevRevenue) +
+            ' vs ' + esc(cmp.prevAcademicYear) + ' (' + esc(rpShort(t.prevRevenue)) + ')';
+          el('kpiTxnDelta').innerHTML = growthHtml(t.txn, t.prevTxn) +
+            ' vs ' + esc(cmp.prevAcademicYear) + ' (' + esc(fmtInt.format(t.prevTxn)) + ')';
+        } else {
+          el('kpiRevenueDelta').textContent = '';
+          el('kpiTxnDelta').textContent = '';
+        }
+        el('kpiBranchesNote').textContent = on ? 'dengan transaksi di ' + cmp.academicYear : '';
+
+        renderTrend(data);
+        renderTable(data);
+
+        var range = data.options.minDate ? ' Data tersedia ' + fmtDate(data.options.minDate) + ' s/d ' + fmtDate(data.options.maxDate) + '.' : '';
+        el('meta').textContent = 'Diperbarui ' + new Date(data.generatedAt).toLocaleString('id-ID') + '.' + range;
+      }
+
+      function renderTable(data) {
+        var cmp = data.comparison;
+        var on = cmp.enabled;
+        el('tableLegend').innerHTML = on
+          ? '<span class="key"><span class="swatch-bar"></span>' + esc(cmp.academicYear) + '</span>' +
+            '<span class="key"><span class="swatch-tick"></span>' + esc(cmp.prevAcademicYear) + ' (periode sama)</span>'
+          : '';
 
         var rows = data.branches;
         if (!rows.length) {
           el('content').innerHTML = '<div class="status">Tidak ada data untuk filter ini.</div>';
-        } else {
-          var max = rows[0].revenue || 1;
-          var total = data.totals.revenue || 1;
-          var html = '<div class="table-scroll"><table><thead><tr>' +
-            '<th>#</th><th>Branch</th><th>Revenue</th>' +
-            '<th class="num">Transaksi</th><th class="num hide-sm">Porsi</th>' +
-            '</tr></thead><tbody>';
-          rows.forEach(function (r, i) {
-            var w = Math.max(0, r.revenue / max * 100);
-            html += '<tr title="' + esc(r.branch) + ': ' + esc(fmtRp.format(r.revenue)) + '">' +
-              '<td class="rank">' + (i + 1) + '</td>' +
-              '<td class="branch">' + esc(r.branch) + '</td>' +
-              '<td class="barcell"><div class="bar">' +
-                '<span class="fill" style="width:' + w.toFixed(2) + '%"></span>' +
-                '<span class="val">' + esc(fmtCompact.format(r.revenue)) + '</span>' +
-              '</div></td>' +
-              '<td class="num">' + fmtInt.format(r.txn) + '</td>' +
-              '<td class="num hide-sm">' + fmtPct.format(r.revenue / total) + '</td>' +
-              '</tr>';
-          });
-          html += '</tbody><tfoot><tr><td></td><td>Total</td>' +
-            '<td>' + esc(fmtRp.format(data.totals.revenue)) + '</td>' +
-            '<td class="num">' + fmtInt.format(data.totals.txn) + '</td>' +
-            '<td class="num hide-sm">100,0%</td></tr></tfoot></table></div>';
-          el('content').innerHTML = html;
+          return;
         }
+        var max = 1;
+        rows.forEach(function (r) { max = Math.max(max, r.revenue, on ? r.prevRevenue : 0); });
+        var total = data.totals.revenue || 1;
 
-        var range = data.options.minDate ? ' Data tersedia ' + data.options.minDate + ' s/d ' + data.options.maxDate + '.' : '';
-        el('meta').textContent = 'Diperbarui ' + new Date(data.generatedAt).toLocaleString('id-ID') + '.' + range;
+        var html = '<div class="table-scroll"><table><thead><tr>' +
+          '<th class="rank">#</th><th>Branch</th><th>Revenue</th>' +
+          (on ? '<th class="num hide-sm">' + esc(cmp.prevAcademicYear) + '</th><th class="num">Growth</th>' : '') +
+          '<th class="num' + (on ? ' hide-sm' : '') + '">Transaksi</th><th class="num hide-sm">Porsi</th>' +
+          '</tr></thead><tbody>';
+        rows.forEach(function (r, i) {
+          var w = r.revenue / max * 100;
+          var pw = on ? r.prevRevenue / max * 100 : 0;
+          var tip = r.branch + ': ' + fmtRp.format(r.revenue) +
+            (on ? '\n' + cmp.prevAcademicYear + ': ' + fmtRp.format(r.prevRevenue) : '');
+          html += '<tr title="' + esc(tip) + '">' +
+            '<td class="rank">' + (i + 1) + '</td>' +
+            '<td class="branch">' + esc(r.branch) + '</td>' +
+            '<td class="barcell"><div class="bar">' +
+              '<span class="fill" style="width:' + w.toFixed(2) + '%"></span>' +
+              (on && r.prevRevenue > 0 ? '<span class="tick" style="left:' + pw.toFixed(2) + '%"></span>' : '') +
+              // Label nilai selalu setelah elemen terpanjang (bar atau penanda tahun lalu).
+              '<span class="val" style="left:calc(' + Math.max(w, pw).toFixed(2) + '% + 8px)">' + esc(fmtCompact.format(r.revenue)) + '</span>' +
+            '</div></td>' +
+            (on ? '<td class="num hide-sm">' + esc(fmtCompact.format(r.prevRevenue)) + '</td>' +
+                  '<td class="num">' + growthHtml(r.revenue, r.prevRevenue) + '</td>' : '') +
+            '<td class="num' + (on ? ' hide-sm' : '') + '">' + fmtInt.format(r.txn) + '</td>' +
+            '<td class="num hide-sm">' + fmtPct.format(r.revenue / total) + '</td>' +
+            '</tr>';
+        });
+        var t = data.totals;
+        html += '</tbody><tfoot><tr><td class="rank"></td><td>Total</td>' +
+          '<td>' + esc(fmtRp.format(t.revenue)) + '</td>' +
+          (on ? '<td class="num hide-sm">' + esc(fmtCompact.format(t.prevRevenue)) + '</td>' +
+                '<td class="num">' + growthHtml(t.revenue, t.prevRevenue) + '</td>' : '') +
+          '<td class="num' + (on ? ' hide-sm' : '') + '">' + fmtInt.format(t.txn) + '</td>' +
+          '<td class="num hide-sm">100,0%</td></tr></tfoot></table></div>';
+        el('content').innerHTML = html;
       }
+
+      /* ---------------- Trend chart (SVG) ---------------- */
+
+      function niceMax(v) {
+        if (v <= 0) return 1;
+        var p = Math.pow(10, Math.floor(Math.log10(v)));
+        var steps = [1, 2, 2.5, 5, 10];
+        for (var i = 0; i < steps.length; i++) if (steps[i] * p >= v) return steps[i] * p;
+        return 10 * p;
+      }
+
+      function renderTrend(data) {
+        var box = el('trend');
+        var tr = data.trend;
+        var cmp = data.comparison;
+        var series = [{ name: cmp.enabled ? cmp.academicYear : 'Revenue', values: tr.current, color: 'var(--series-1)' }];
+        if (tr.previous) series.push({ name: cmp.prevAcademicYear + ' (periode sama)', short: cmp.prevAcademicYear, values: tr.previous, color: 'var(--series-2)' });
+
+        el('trendLegend').innerHTML = series.length > 1 ? series.map(function (s) {
+          return '<span class="key"><span class="swatch-line" style="background:' + s.color + '"></span>' + esc(s.name) + '</span>';
+        }).join('') : '';
+
+        var n = tr.labels.length;
+        if (!n) { box.innerHTML = '<div class="status">Tidak ada data untuk filter ini.</div>'; return; }
+
+        var W = Math.max(box.clientWidth, 280);
+        var H = 260;
+        var m = { l: 52, r: 44, t: 12, b: 28 };
+        var pw = W - m.l - m.r;
+        var ph = H - m.t - m.b;
+        var maxV = 0;
+        series.forEach(function (s) { s.values.forEach(function (v) { if (v != null && v > maxV) maxV = v; }); });
+        var yMax = niceMax(maxV);
+        function x(i) { return m.l + (n === 1 ? pw / 2 : i * pw / (n - 1)); }
+        function y(v) { return m.t + ph - v / yMax * ph; }
+
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tren revenue bulanan">';
+        // grid + y labels
+        for (var g = 0; g <= 4; g++) {
+          var gv = yMax * g / 4;
+          var gy = y(gv);
+          svg += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + gy + '" y2="' + gy + '" stroke="' + (g === 0 ? 'var(--axis)' : 'var(--grid)') + '" stroke-width="1"/>';
+          svg += '<text x="' + (m.l - 8) + '" y="' + (gy + 4) + '" text-anchor="end">' + esc(fmtAxis.format(gv)) + '</text>';
+        }
+        // x labels (thin out when crowded)
+        var every = Math.ceil(n / Math.max(1, Math.floor(pw / 44)));
+        tr.labels.forEach(function (lab, i) {
+          if (i % every === 0 || i === n - 1) {
+            svg += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(lab) + '</text>';
+          }
+        });
+        // lines + markers
+        var ends = [];
+        series.forEach(function (s) {
+          var d = '';
+          var pen = false;
+          var last = -1;
+          s.values.forEach(function (v, i) {
+            if (v == null) { pen = false; return; }
+            d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1);
+            pen = true;
+            last = i;
+          });
+          svg += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+          s.values.forEach(function (v, i) {
+            if (v == null) return;
+            svg += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="4" fill="' + s.color + '" stroke="var(--surface-1)" stroke-width="2"/>';
+          });
+          if (last >= 0) ends.push({ x: x(last), y: y(s.values[last]), label: s.short || s.name });
+        });
+        // direct labels di ujung garis (hindari tumpang tindih)
+        if (series.length > 1) {
+          ends.sort(function (a, b) { return a.y - b.y; });
+          for (var k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 14) ends[k].y = ends[k - 1].y + 14;
+          ends.forEach(function (e) {
+            svg += '<text x="' + (e.x + 8) + '" y="' + (e.y + 4) + '">' + esc(e.label) + '</text>';
+          });
+        }
+        // hover layer
+        svg += '<line id="xhair" y1="' + m.t + '" y2="' + (m.t + ph) + '" stroke="var(--axis)" stroke-width="1" visibility="hidden"/>';
+        svg += '<rect id="hit" x="' + (m.l - 10) + '" y="0" width="' + (pw + 20) + '" height="' + H + '" fill="transparent"/>';
+        svg += '</svg><div class="tooltip" id="tip"></div>';
+        box.innerHTML = svg;
+
+        var hit = el('hit'), tip = el('tip'), xh = el('xhair');
+        function show(evt) {
+          var rect = box.getBoundingClientRect();
+          var px = (evt.touches ? evt.touches[0].clientX : evt.clientX) - rect.left;
+          var i = n === 1 ? 0 : Math.round((px - m.l) / (pw / (n - 1)));
+          i = Math.max(0, Math.min(n - 1, i));
+          xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i));
+          xh.setAttribute('visibility', 'visible');
+          var html = '<div class="t-title">' + esc(tr.labels[i]) + '</div>';
+          series.forEach(function (s) {
+            var v = s.values[i];
+            html += '<div class="t-row"><span class="t-name"><span class="swatch-line" style="background:' + s.color + '"></span>' +
+              esc(s.short || s.name) + '</span><span>' + (v == null ? '–' : esc(fmtRp.format(v))) + '</span></div>';
+          });
+          if (series.length > 1 && series[0].values[i] != null && series[1].values[i] != null) {
+            html += '<div class="t-row"><span class="t-name">Growth</span><span>' + growthHtml(series[0].values[i], series[1].values[i]) + '</span></div>';
+          }
+          tip.innerHTML = html;
+          tip.style.display = 'block';
+          var tx = x(i) + 12;
+          if (tx + tip.offsetWidth > W) tx = x(i) - tip.offsetWidth - 12;
+          tip.style.left = tx + 'px';
+          tip.style.top = m.t + 'px';
+        }
+        function hide() { tip.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); }
+        hit.addEventListener('mousemove', show);
+        hit.addEventListener('touchstart', show, { passive: true });
+        hit.addEventListener('mouseleave', hide);
+      }
+
+      var resizeTimer;
+      window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () { if (lastData) renderTrend(lastData); }, 150);
+      });
 
       ['from', 'to', 'academicYear', 'productType'].forEach(function (id) {
         el(id).addEventListener('change', load);

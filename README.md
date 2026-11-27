@@ -41,7 +41,12 @@ File: `apps-script/WebApp.gs` + `apps-script/Dashboard.html` (di project Apps Sc
 - Sumber data: sheet **`[Use] Raw Txn`**, kolom dicari berdasarkan nama header baris 1
   (`Payment Date`, `Cluster`, `Revenue`, `Academic Year`, `New Product Type`).
 - Agregasi dilakukan di server; browser hanya menerima ringkasan per branch.
-- Filter: rentang Payment Date, Academic Year, New Product Type.
+- Filter: Academic Year, rentang Payment Date, New Product Type.
+- Tren revenue bulanan (berdasarkan bulan Payment Date).
+- **Perbandingan YoY**: jika Academic Year dipilih (mis. `26/27`) dan Academic Year sebelumnya (`25/26`) ada di data,
+  capaian dibandingkan pada periode yang sama digeser 1 tahun. Tanggal akhir = filter *Sampai tanggal*, atau
+  Payment Date terakhir di tabel bila kosong (mis. s/d 26 Nov 2026 vs s/d 26 Nov 2025). Filter *Dari tanggal* dan
+  *New Product Type* berlaku untuk kedua periode.
 
 ## Deploy
 1. Di editor Apps Script tambahkan file script **`WebApp`** (isi dari `WebApp.gs`) dan file HTML **`Dashboard`** (isi dari `Dashboard.html`).
