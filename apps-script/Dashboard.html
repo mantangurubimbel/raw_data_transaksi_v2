@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <style>
+      :root {
+        color-scheme: light;
+        --surface-0: #f6f7f9;
+        --surface-1: #ffffff;
+        --border: #e3e5e8;
+        --grid: #eef0f2;
+        --text-primary: #191919;
+        --text-secondary: #666666;
+        --series-1: #257de0;
+        --hover: #f2f6fc;
+        --error: #c5221f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:where(:not([data-theme="light"])) {
+          color-scheme: dark;
+          --surface-0: #111111;
+          --surface-1: #191919;
+          --border: #2c2c2c;
+          --grid: #242424;
+          --text-primary: #efefef;
+          --text-secondary: #9c9c9c;
+          --series-1: #338ced;
+          --hover: #1f2630;
+          --error: #f28b82;
+        }
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --surface-0: #111111;
+        --surface-1: #191919;
+        --border: #2c2c2c;
+        --grid: #242424;
+        --text-primary: #efefef;
+        --text-secondary: #9c9c9c;
+        --series-1: #338ced;
+        --hover: #1f2630;
+        --error: #f28b82;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--surface-0);
+        color: var(--text-primary);
+        font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+      h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+      .sub { color: var(--text-secondary); margin: 0 0 20px; }
+
+      .filters {
+        display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+        margin-bottom: 20px;
+      }
+      .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+      .filters input, .filters select {
+        height: 34px; padding: 0 8px; min-width: 150px;
+        border: 1px solid var(--border); border-radius: 6px;
+        background: var(--surface-1); color: var(--text-primary); font: inherit;
+      }
+      .filters button {
+        height: 34px; padding: 0 14px; border-radius: 6px; cursor: pointer; font: inherit;
+        border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+      }
+
+      .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+      .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+      .kpi .label { font-size: 12px; color: var(--text-secondary); }
+      .kpi .value { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+      .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+      .card h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
+
+      table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+      th {
+        text-align: left; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+        padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap;
+      }
+      th.num, td.num { text-align: right; }
+      td { padding: 5px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+      tbody tr:hover { background: var(--hover); }
+      td.rank { color: var(--text-secondary); width: 32px; }
+      td.branch { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+      td.barcell { width: 45%; min-width: 120px; }
+      /* Track = lebar sel dikurangi ruang label, supaya panjang bar proporsional
+         dan label nilai selalu muat di ujung bar. */
+      .bar { display: flex; align-items: center; gap: 8px; width: calc(100% - 80px); }
+      .bar span.fill {
+        flex: none; display: block; height: 16px; background: var(--series-1);
+        border-radius: 0 4px 4px 0; min-width: 2px;
+      }
+      .bar span.val { flex: none; color: var(--text-primary); font-size: 13px; }
+      tfoot td { font-weight: 600; border-top: 1px solid var(--border); border-bottom: 0; }
+
+      .status { color: var(--text-secondary); padding: 24px 0; text-align: center; }
+      .status.error { color: var(--error); white-space: pre-wrap; }
+      .meta { color: var(--text-secondary); font-size: 12px; margin-top: 10px; }
+
+      @media (max-width: 700px) {
+        .kpis { grid-template-columns: 1fr; }
+        .filters label, .filters input, .filters select { width: 100%; }
+        .table-scroll { overflow-x: auto; }
+        th.hide-sm, td.hide-sm { display: none; }
+        th, td { padding-left: 4px; padding-right: 4px; }
+        td.branch { white-space: normal; max-width: 110px; }
+        td.barcell { min-width: 140px; }
+        tfoot td { white-space: normal; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Revenue per Branch</h1>
+      <p class="sub">Sumber: sheet <b>[Use] Raw Txn</b>, dikelompokkan berdasarkan kolom Cluster.</p>
+
+      <div class="filters">
+        <label>Dari tanggal <input type="date" id="from"></label>
+        <label>Sampai tanggal <input type="date" id="to"></label>
+        <label>Academic Year <select id="academicYear"><option value="">Semua</option></select></label>
+        <label>New Product Type <select id="productType"><option value="">Semua</option></select></label>
+        <button id="reset" type="button">Reset</button>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="label">Total Revenue</div><div class="value" id="kpiRevenue">–</div></div>
+        <div class="kpi"><div class="label">Jumlah Transaksi</div><div class="value" id="kpiTxn">–</div></div>
+        <div class="kpi"><div class="label">Jumlah Branch</div><div class="value" id="kpiBranches">–</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Revenue per branch, urut dari terbesar</h2>
+        <div id="content"><div class="status">Memuat data…</div></div>
+        <div class="meta" id="meta"></div>
+      </div>
+    </div>
+
+    <script>
+      var fmtRp = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+      var fmtCompact = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 2 });
+      var fmtInt = new Intl.NumberFormat('id-ID');
+      var fmtPct = new Intl.NumberFormat('id-ID', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      var optionsLoaded = false;
+      var requestSeq = 0;
+
+      function el(id) { return document.getElementById(id); }
+      function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      function currentFilters() {
+        return {
+          from: el('from').value,
+          to: el('to').value,
+          academicYear: el('academicYear').value,
+          productType: el('productType').value
+        };
+      }
+
+      function load() {
+        var seq = ++requestSeq;
+        el('content').innerHTML = '<div class="status">Memuat data…</div>';
+        google.script.run
+          .withSuccessHandler(function (data) { if (seq === requestSeq) render(data); })
+          .withFailureHandler(function (err) {
+            if (seq !== requestSeq) return;
+            el('content').innerHTML = '<div class="status error">' + esc((err && err.message) || err) + '</div>';
+          })
+          .getDashboardData(currentFilters());
+      }
+
+      function fillSelect(id, values) {
+        var sel = el(id);
+        values.forEach(function (v) {
+          var o = document.createElement('option');
+          o.value = v; o.textContent = v;
+          sel.appendChild(o);
+        });
+      }
+
+      function render(data) {
+        if (!optionsLoaded) {
+          fillSelect('academicYear', data.options.academicYears);
+          fillSelect('productType', data.options.productTypes);
+          ['from', 'to'].forEach(function (id) {
+            el(id).min = data.options.minDate;
+            el(id).max = data.options.maxDate;
+          });
+          optionsLoaded = true;
+        }
+
+        el('kpiRevenue').textContent = 'Rp ' + fmtCompact.format(data.totals.revenue);
+        el('kpiRevenue').title = fmtRp.format(data.totals.revenue);
+        el('kpiTxn').textContent = fmtInt.format(data.totals.txn);
+        el('kpiBranches').textContent = fmtInt.format(data.totals.branches);
+
+        var rows = data.branches;
+        if (!rows.length) {
+          el('content').innerHTML = '<div class="status">Tidak ada data untuk filter ini.</div>';
+        } else {
+          var max = rows[0].revenue || 1;
+          var total = data.totals.revenue || 1;
+          var html = '<div class="table-scroll"><table><thead><tr>' +
+            '<th>#</th><th>Branch</th><th>Revenue</th>' +
+            '<th class="num">Transaksi</th><th class="num hide-sm">Porsi</th>' +
+            '</tr></thead><tbody>';
+          rows.forEach(function (r, i) {
+            var w = Math.max(0, r.revenue / max * 100);
+            html += '<tr title="' + esc(r.branch) + ': ' + esc(fmtRp.format(r.revenue)) + '">' +
+              '<td class="rank">' + (i + 1) + '</td>' +
+              '<td class="branch">' + esc(r.branch) + '</td>' +
+              '<td class="barcell"><div class="bar">' +
+                '<span class="fill" style="width:' + w.toFixed(2) + '%"></span>' +
+                '<span class="val">' + esc(fmtCompact.format(r.revenue)) + '</span>' +
+              '</div></td>' +
+              '<td class="num">' + fmtInt.format(r.txn) + '</td>' +
+              '<td class="num hide-sm">' + fmtPct.format(r.revenue / total) + '</td>' +
+              '</tr>';
+          });
+          html += '</tbody><tfoot><tr><td></td><td>Total</td>' +
+            '<td>' + esc(fmtRp.format(data.totals.revenue)) + '</td>' +
+            '<td class="num">' + fmtInt.format(data.totals.txn) + '</td>' +
+            '<td class="num hide-sm">100,0%</td></tr></tfoot></table></div>';
+          el('content').innerHTML = html;
+        }
+
+        var range = data.options.minDate ? ' Data tersedia ' + data.options.minDate + ' s/d ' + data.options.maxDate + '.' : '';
+        el('meta').textContent = 'Diperbarui ' + new Date(data.generatedAt).toLocaleString('id-ID') + '.' + range;
+      }
+
+      ['from', 'to', 'academicYear', 'productType'].forEach(function (id) {
+        el(id).addEventListener('change', load);
+      });
+      el('reset').addEventListener('click', function () {
+        ['from', 'to', 'academicYear', 'productType'].forEach(function (id) { el(id).value = ''; });
+        load();
+      });
+
+      load();
+    </script>
+  </body>
+</html>

@@ -31,3 +31,21 @@ Menambahkan menu **Import Transaksi → Upload CSV ke Raw Txn** di Google Sheet.
 - Semua validasi dilakukan **sebelum** `Raw Txn` dibersihkan; jika ada error, sheet tidak diubah.
 - Yang dibersihkan hanya kolom A–R baris 2 ke bawah. Kolom formula di sebelah kanan tidak disentuh.
 - Konfigurasi (nama sheet, daftar kolom) ada di objek `CONFIG` di awal `Code.gs`.
+
+---
+
+# Web App: Revenue per Branch
+
+File: `apps-script/WebApp.gs` + `apps-script/Dashboard.html` (di project Apps Script yang sama).
+
+- Sumber data: sheet **`[Use] Raw Txn`**, kolom dicari berdasarkan nama header baris 1
+  (`Payment Date`, `Cluster`, `Revenue`, `Academic Year`, `New Product Type`).
+- Agregasi dilakukan di server; browser hanya menerima ringkasan per branch.
+- Filter: rentang Payment Date, Academic Year, New Product Type.
+
+## Deploy
+1. Di editor Apps Script tambahkan file script **`WebApp`** (isi dari `WebApp.gs`) dan file HTML **`Dashboard`** (isi dari `Dashboard.html`).
+2. **Deploy → New deployment → Select type: Web app**.
+   - *Execute as*: **Me**
+   - *Who has access*: **Anyone within ruangguru** (atau sesuai kebutuhan)
+3. Salin URL `/exec` yang muncul. Setelah mengubah kode, gunakan **Manage deployments → Edit → New version** agar URL tetap sama.
