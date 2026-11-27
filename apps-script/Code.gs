@@ -158,7 +158,12 @@ function transformRows_(rows, lookups) {
       continue;
     }
     var v = {};
-    CONFIG.CSV_COLUMNS.forEach(function (name) { v[name] = row[src[name]]; });
+    // Semua sel berisi "null" dikosongkan (Revenue kosong nanti diisi 0).
+    CONFIG.CSV_COLUMNS.forEach(function (name) {
+      var val = row[src[name]];
+      if (isNullText_(val)) row[src[name]] = val = '';
+      v[name] = val;
+    });
 
     // Payment Date -> tanggal asli (serial number), format yyyy-mm-dd diatur di sheet.
     var serial = parseDateToSerial_(row[src['Payment Date']]);
@@ -185,7 +190,7 @@ function transformRows_(rows, lookups) {
     var nptKey = lookupKey_(npt);
     if (has_(lookups.productType, nptKey)) {
       v['New Product Type'] = lookups.productType[nptKey];
-    } else {
+    } else if (nptKey !== '') {
       unmappedPT[npt] = true;
     }
 
@@ -222,6 +227,10 @@ function transformRows_(rows, lookups) {
     unmappedProductTypes: Object.keys(unmappedPT).sort(),
     unmappedClassNames: Object.keys(unmappedClass).sort()
   };
+}
+
+function isNullText_(val) {
+  return String(val).trim().toLowerCase() === 'null';
 }
 
 function lookupKey_(text) {
@@ -345,12 +354,14 @@ function writeToTarget_(sheet, data) {
 
   // 3. Format kolom sebelum menulis: teks untuk kolom string (mencegah "25/26" jadi
   //    tanggal dan NPSN kehilangan angka 0 di depan), tanggal, dan angka.
-  //    Renewal Status (boolean) & Grade (hasil lookup) memakai format bawaan.
+  //    Renewal Status dipaksa ke format "General" (Automatic) agar TRUE/FALSE tersimpan
+  //    sebagai boolean, bukan teks, walaupun kolom itu sebelumnya berformat teks.
+  //    Grade (hasil lookup) memakai format yang sudah ada.
   var rows = data.length;
   var special = {
     'Payment Date': 'yyyy-mm-dd',
     'Revenue': '0',
-    'Renewal Status': null,
+    'Renewal Status': 'General',
     'Grade': null
   };
   for (var c = 0; c < n; c++) {

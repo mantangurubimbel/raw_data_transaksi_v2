@@ -20,7 +20,8 @@ Menambahkan menu **Import Transaksi → Upload CSV ke Raw Txn** di Google Sheet.
   dan daftarnya ditampilkan setelah upload.
 - `Grade` → lookup `Class Name` ke sheet **Validation** (header `Kelas` → `Grade`), case-insensitive.
   Jika tidak ditemukan, Grade dikosongkan dan daftar Class Name tersebut ditampilkan setelah upload.
-- `Renewal Status` → boolean TRUE/FALSE (`null` → sel kosong).
+- Semua sel berisi `null` dikosongkan (khusus `Revenue` diisi 0).
+- `Renewal Status` → boolean TRUE/FALSE (bukan teks; kolom diformat Automatic). `null` → sel kosong.
 - `Revenue` → angka, `null` → 0.
 - `school_npsn` dan kolom teks lain ditulis sebagai teks (angka 0 di depan tidak hilang).
 - Urutan baris mengikuti CSV (tidak diurutkan ulang).
