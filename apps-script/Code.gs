@@ -3,10 +3,10 @@
  *
  * Alur:
  *   1. Menu "Import Transaksi" > "Upload CSV ke Raw Txn" membuka dialog (Upload.html).
- *   2. Browser membaca & mem-parse CSV, lalu hanya mengirim 18 kolom yang dibutuhkan
- *      (supaya payload kecil) ke fungsi server importRawTxn().
- *   3. Server memvalidasi & mentransformasi semua baris. Jika ada error, proses
- *      dibatalkan dan sheet "Raw Txn" TIDAK disentuh.
+ *   2. Browser membaca & mem-parse CSV, lalu hanya mengirim kolom yang dibutuhkan
+ *      (CONFIG.CSV_COLUMNS) ke fungsi server importRawTxn() supaya payload kecil.
+ *   3. Server memvalidasi & mentransformasi semua baris, termasuk lookup ke sheet
+ *      Validation. Jika ada error, proses dibatalkan dan "Raw Txn" TIDAK disentuh.
  *   4. Isi "Raw Txn" baris 2 ke bawah pada kolom 1..18 dikosongkan (kolom formula di
  *      kanannya tidak disentuh), lalu data baru ditulis per batch.
  */
@@ -14,11 +14,10 @@
 var CONFIG = {
   TARGET_SHEET: 'Raw Txn',
   VALIDATION_SHEET: 'Validation',
-  LOOKUP_KEY_HEADER: 'New Product Type',
-  LOOKUP_VALUE_HEADER: 'New Product Type Edited',
   WRITE_BATCH_ROWS: 5000,
-  // Urutan kolom = urutan header di baris 1 sheet "Raw Txn".
-  COLUMNS: [
+
+  // Kolom yang diambil dari CSV (dicocokkan berdasarkan nama header).
+  CSV_COLUMNS: [
     'Payment Date',
     'Month',
     'Invoice',
@@ -30,14 +29,39 @@ var CONFIG = {
     'Agent Name',
     'Product Cluster',
     'Cluster',
-    'Region',
     'Payment Category',
     'Payment Option',
     'Academic Year',
     'Renewal Status',
     'school_npsn',
     'Revenue'
-  ]
+  ],
+
+  // Urutan kolom = urutan header di baris 1 sheet "Raw Txn" (kolom A..R).
+  TARGET_COLUMNS: [
+    'Payment Date',
+    'Month',
+    'Invoice',
+    'User ID',
+    'User Email',
+    'Class Name',
+    'Package Category',
+    'New Product Type',
+    'Agent Name',
+    'Product Cluster',
+    'Cluster',
+    'Payment Category',
+    'Payment Option',
+    'Academic Year',
+    'Renewal Status',
+    'school_npsn',
+    'Revenue',
+    'Grade'
+  ],
+
+  // Lookup ke sheet Validation (header di baris 1, pencocokan case-insensitive).
+  PRODUCT_TYPE_LOOKUP: { key: 'New Product Type', value: 'New Product Type Edited' },
+  GRADE_LOOKUP: { key: 'Kelas', value: 'Grade' }
 };
 
 var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -55,9 +79,9 @@ function onOpen() {
 
 function showUploadDialog() {
   var html = HtmlService.createTemplateFromFile('Upload');
-  html.columns = CONFIG.COLUMNS;
+  html.columns = CONFIG.CSV_COLUMNS;
   SpreadsheetApp.getUi().showModalDialog(
-    html.evaluate().setWidth(520).setHeight(360),
+    html.evaluate().setWidth(520).setHeight(400),
     'Upload CSV ke Raw Txn'
   );
 }
@@ -67,10 +91,9 @@ function showUploadDialog() {
 /* ------------------------------------------------------------------ */
 
 /**
- * @param {string[][]} rows  Baris data (tanpa header), sudah berisi 18 kolom
- *                           sesuai urutan CONFIG.COLUMNS, semua bernilai string.
+ * @param {string[][]} rows  Baris data (tanpa header) berisi kolom sesuai urutan
+ *                           CONFIG.CSV_COLUMNS, semua bernilai string.
  * @param {string} fileName  Nama file, hanya untuk pesan ringkasan.
- * @return {{rows:number, fileName:string, unmappedProductTypes:string[]}}
  */
 function importRawTxn(rows, fileName) {
   if (!rows || !rows.length) throw new Error('CSV tidak berisi data.');
@@ -85,10 +108,10 @@ function importRawTxn(rows, fileName) {
     if (!target) throw new Error('Sheet "' + CONFIG.TARGET_SHEET + '" tidak ditemukan.');
 
     assertTargetHeader_(target);
-    var lookup = loadProductTypeLookup_(ss);
+    var lookups = loadLookups_(ss);
 
     // Validasi + transformasi SEBELUM sheet dibersihkan.
-    var result = transformRows_(rows, lookup);
+    var result = transformRows_(rows, lookups);
     if (result.errors.length) {
       var shown = result.errors.slice(0, 15).join('\n');
       var more = result.errors.length > 15 ? '\n... dan ' + (result.errors.length - 15) + ' error lainnya.' : '';
@@ -100,7 +123,8 @@ function importRawTxn(rows, fileName) {
     return {
       rows: result.data.length,
       fileName: fileName || '',
-      unmappedProductTypes: result.unmapped
+      unmappedProductTypes: result.unmappedProductTypes,
+      unmappedClassNames: result.unmappedClassNames
     };
   } finally {
     lock.releaseLock();
@@ -112,75 +136,100 @@ function importRawTxn(rows, fileName) {
 /* ------------------------------------------------------------------ */
 
 /**
- * @param {string[][]} rows
- * @param {Object<string,string>} lookup  key = New Product Type (lowercase, trim)
- * @return {{data:Array[], errors:string[], unmapped:string[]}}
+ * @param {string[][]} rows  baris sesuai CONFIG.CSV_COLUMNS
+ * @param {{productType:Object, grade:Object}} lookups  key = lowercase + trim
+ * @return {{data:Array[], errors:string[], unmappedProductTypes:string[], unmappedClassNames:string[]}}
  */
-function transformRows_(rows, lookup) {
-  var idx = {};
-  CONFIG.COLUMNS.forEach(function (name, i) { idx[name] = i; });
-  var n = CONFIG.COLUMNS.length;
+function transformRows_(rows, lookups) {
+  var src = {};
+  CONFIG.CSV_COLUMNS.forEach(function (name, i) { src[name] = i; });
+  var nSrc = CONFIG.CSV_COLUMNS.length;
 
   var data = [];
   var errors = [];
-  var unmapped = {};
+  var unmappedPT = {};
+  var unmappedClass = {};
 
   for (var r = 0; r < rows.length; r++) {
-    var src = rows[r];
+    var row = rows[r];
     var line = r + 2; // nomor baris di file CSV (baris 1 = header)
-    if (!src || src.length !== n) {
+    if (!row || row.length !== nSrc) {
       errors.push('Baris ' + line + ': jumlah kolom tidak sesuai.');
       continue;
     }
-    var out = src.slice();
+    var v = {};
+    CONFIG.CSV_COLUMNS.forEach(function (name) { v[name] = row[src[name]]; });
 
     // Payment Date -> tanggal asli (serial number), format yyyy-mm-dd diatur di sheet.
-    var serial = parseDateToSerial_(src[idx['Payment Date']]);
+    var serial = parseDateToSerial_(row[src['Payment Date']]);
     if (serial === null) {
-      errors.push('Baris ' + line + ': Payment Date tidak valid "' + src[idx['Payment Date']] + '".');
+      errors.push('Baris ' + line + ': Payment Date tidak valid "' + row[src['Payment Date']] + '".');
     } else {
-      out[idx['Payment Date']] = serial;
+      v['Payment Date'] = serial;
     }
 
     // Month -> nama bulan 3 huruf, diambil dari kolom Month itu sendiri.
-    var mon = parseMonthAbbr_(src[idx['Month']]);
+    var mon = parseMonthAbbr_(row[src['Month']]);
     if (mon === null) {
-      errors.push('Baris ' + line + ': Month tidak valid "' + src[idx['Month']] + '".');
+      errors.push('Baris ' + line + ': Month tidak valid "' + row[src['Month']] + '".');
     } else {
-      out[idx['Month']] = mon;
+      v['Month'] = mon;
     }
 
     // Payment Option -> FULL_PAYMENT / INSTALLMENT.
-    out[idx['Payment Option']] =
-      String(src[idx['Payment Option']]).trim().toUpperCase() === 'FULL_PAYMENT' ? 'FULL_PAYMENT' : 'INSTALLMENT';
+    v['Payment Option'] =
+      String(row[src['Payment Option']]).trim().toUpperCase() === 'FULL_PAYMENT' ? 'FULL_PAYMENT' : 'INSTALLMENT';
 
-    // New Product Type -> lookup case-insensitive; jika tidak ada, pertahankan nilai asli.
-    var npt = String(src[idx['New Product Type']]);
-    var key = npt.trim().toLowerCase();
-    if (Object.prototype.hasOwnProperty.call(lookup, key)) {
-      out[idx['New Product Type']] = lookup[key];
+    // New Product Type -> lookup; jika tidak ada, pertahankan nilai asli.
+    var npt = String(row[src['New Product Type']]);
+    var nptKey = lookupKey_(npt);
+    if (has_(lookups.productType, nptKey)) {
+      v['New Product Type'] = lookups.productType[nptKey];
     } else {
-      unmapped[npt] = true;
+      unmappedPT[npt] = true;
+    }
+
+    // Grade -> lookup Class Name ke kolom "Kelas"; jika tidak ada, kosong.
+    var cls = String(row[src['Class Name']]);
+    var clsKey = lookupKey_(cls);
+    if (has_(lookups.grade, clsKey)) {
+      v['Grade'] = lookups.grade[clsKey];
+    } else {
+      v['Grade'] = '';
+      if (clsKey !== '' && clsKey !== 'null') unmappedClass[cls] = true;
     }
 
     // Renewal Status -> boolean; "null"/kosong -> sel kosong.
-    var rs = String(src[idx['Renewal Status']]).trim().toLowerCase();
-    out[idx['Renewal Status']] = rs === 'true' ? true : rs === 'false' ? false : '';
+    var rs = String(row[src['Renewal Status']]).trim().toLowerCase();
+    v['Renewal Status'] = rs === 'true' ? true : rs === 'false' ? false : '';
 
     // Revenue -> angka; "null"/kosong -> 0.
-    var rev = String(src[idx['Revenue']]).trim();
+    var rev = String(row[src['Revenue']]).trim();
     if (rev === '' || rev.toLowerCase() === 'null') {
-      out[idx['Revenue']] = 0;
+      v['Revenue'] = 0;
     } else if (/^-?\d+(\.\d+)?$/.test(rev)) {
-      out[idx['Revenue']] = Number(rev);
+      v['Revenue'] = Number(rev);
     } else {
       errors.push('Baris ' + line + ': Revenue bukan angka "' + rev + '".');
     }
 
-    data.push(out);
+    data.push(CONFIG.TARGET_COLUMNS.map(function (name) { return v[name]; }));
   }
 
-  return { data: data, errors: errors, unmapped: Object.keys(unmapped).sort() };
+  return {
+    data: data,
+    errors: errors,
+    unmappedProductTypes: Object.keys(unmappedPT).sort(),
+    unmappedClassNames: Object.keys(unmappedClass).sort()
+  };
+}
+
+function lookupKey_(text) {
+  return String(text).trim().toLowerCase();
+}
+
+function has_(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
 /** "26 Nov 2026" / "25 Sept 2025" -> serial tanggal Google Sheets, atau null. */
@@ -225,17 +274,18 @@ function normalizeHeader_(h) {
   return String(h).replace(/^﻿/, '').trim().toLowerCase();
 }
 
-/** Pastikan header baris 1 Raw Txn (kolom 1..18) sama dengan CONFIG.COLUMNS. */
+/** Pastikan header baris 1 Raw Txn (kolom 1..18) sama dengan CONFIG.TARGET_COLUMNS. */
 function assertTargetHeader_(sheet) {
-  var n = CONFIG.COLUMNS.length;
+  var cols = CONFIG.TARGET_COLUMNS;
+  var n = cols.length;
   if (sheet.getMaxColumns() < n) {
     throw new Error('Sheet "' + CONFIG.TARGET_SHEET + '" kurang dari ' + n + ' kolom.');
   }
   var header = sheet.getRange(1, 1, 1, n).getDisplayValues()[0];
   var diffs = [];
   for (var i = 0; i < n; i++) {
-    if (normalizeHeader_(header[i]) !== normalizeHeader_(CONFIG.COLUMNS[i])) {
-      diffs.push('Kolom ' + (i + 1) + ': di sheet "' + header[i] + '", seharusnya "' + CONFIG.COLUMNS[i] + '"');
+    if (normalizeHeader_(header[i]) !== normalizeHeader_(cols[i])) {
+      diffs.push('Kolom ' + (i + 1) + ': di sheet "' + header[i] + '", seharusnya "' + cols[i] + '"');
     }
   }
   if (diffs.length) {
@@ -243,8 +293,8 @@ function assertTargetHeader_(sheet) {
   }
 }
 
-/** Baca tabel lookup dari sheet Validation berdasarkan nama header di baris 1. */
-function loadProductTypeLookup_(ss) {
+/** Baca semua tabel lookup dari sheet Validation (header di baris 1). */
+function loadLookups_(ss) {
   var sheet = ss.getSheetByName(CONFIG.VALIDATION_SHEET);
   if (!sheet) throw new Error('Sheet "' + CONFIG.VALIDATION_SHEET + '" tidak ditemukan.');
   var lastRow = sheet.getLastRow();
@@ -252,29 +302,36 @@ function loadProductTypeLookup_(ss) {
   if (lastRow < 1 || lastCol < 1) throw new Error('Sheet "' + CONFIG.VALIDATION_SHEET + '" kosong.');
 
   var header = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(normalizeHeader_);
-  var keyCol = header.indexOf(normalizeHeader_(CONFIG.LOOKUP_KEY_HEADER));
-  var valCol = header.indexOf(normalizeHeader_(CONFIG.LOOKUP_VALUE_HEADER));
+  var display = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues() : [];
+  var raw = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
+
+  return {
+    productType: buildLookup_(header, display, display, CONFIG.PRODUCT_TYPE_LOOKUP),
+    // Grade diambil apa adanya (angka tetap angka, teks tetap teks).
+    grade: buildLookup_(header, display, raw, CONFIG.GRADE_LOOKUP)
+  };
+}
+
+function buildLookup_(header, keyValues, resultValues, spec) {
+  var keyCol = header.indexOf(normalizeHeader_(spec.key));
+  var valCol = header.indexOf(normalizeHeader_(spec.value));
   if (keyCol < 0 || valCol < 0) {
-    throw new Error('Header "' + CONFIG.LOOKUP_KEY_HEADER + '" dan/atau "' + CONFIG.LOOKUP_VALUE_HEADER +
+    throw new Error('Header "' + spec.key + '" dan/atau "' + spec.value +
       '" tidak ditemukan di baris 1 sheet "' + CONFIG.VALIDATION_SHEET + '".');
   }
-
   var lookup = {};
-  if (lastRow < 2) return lookup;
-  var values = sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
-  for (var i = 0; i < values.length; i++) {
-    var k = String(values[i][keyCol]).trim().toLowerCase();
-    if (!k || Object.prototype.hasOwnProperty.call(lookup, k)) continue; // ambil kemunculan pertama
-    lookup[k] = values[i][valCol];
+  for (var i = 0; i < keyValues.length; i++) {
+    var k = lookupKey_(keyValues[i][keyCol]);
+    if (!k || has_(lookup, k)) continue; // ambil kemunculan pertama
+    lookup[k] = resultValues[i][valCol];
   }
   return lookup;
 }
 
 /** Kosongkan kolom 1..18 dari baris 2 ke bawah, lalu tulis data baru per batch. */
 function writeToTarget_(sheet, data) {
-  var n = CONFIG.COLUMNS.length;
-  var col = {};
-  CONFIG.COLUMNS.forEach(function (name, i) { col[name] = i + 1; });
+  var cols = CONFIG.TARGET_COLUMNS;
+  var n = cols.length;
 
   // 1. Bersihkan data lama (isi saja; kolom formula di kanan tidak disentuh).
   var lastRow = sheet.getLastRow();
@@ -288,15 +345,17 @@ function writeToTarget_(sheet, data) {
 
   // 3. Format kolom sebelum menulis: teks untuk kolom string (mencegah "25/26" jadi
   //    tanggal dan NPSN kehilangan angka 0 di depan), tanggal, dan angka.
-  //    Kolom Renewal Status tidak diberi format teks agar tetap boolean.
+  //    Renewal Status (boolean) & Grade (hasil lookup) memakai format bawaan.
   var rows = data.length;
-  var special = {};
-  special[col['Payment Date']] = 'yyyy-mm-dd';
-  special[col['Revenue']] = '0';
-  special[col['Renewal Status']] = null; // biarkan format bawaan
-  for (var c = 1; c <= n; c++) {
-    var f = Object.prototype.hasOwnProperty.call(special, c) ? special[c] : '@';
-    if (f !== null) sheet.getRange(2, c, rows, 1).setNumberFormat(f);
+  var special = {
+    'Payment Date': 'yyyy-mm-dd',
+    'Revenue': '0',
+    'Renewal Status': null,
+    'Grade': null
+  };
+  for (var c = 0; c < n; c++) {
+    var f = has_(special, cols[c]) ? special[cols[c]] : '@';
+    if (f !== null) sheet.getRange(2, c + 1, rows, 1).setNumberFormat(f);
   }
 
   // 4. Tulis per batch.

@@ -56,13 +56,18 @@
               btn.disabled = false;
               var msg = 'Selesai. ' + res.rows.toLocaleString('id-ID') + ' baris dari "' +
                 res.fileName + '" berhasil diupload ke Raw Txn.';
+              var warn = false;
               if (res.unmappedProductTypes.length) {
+                warn = true;
                 msg += '\n\nNew Product Type berikut tidak ada di sheet Validation (nilai asli dipertahankan):\n- ' +
                   res.unmappedProductTypes.join('\n- ');
-                setStatus(msg, 'warn');
-              } else {
-                setStatus(msg, 'ok');
               }
+              if (res.unmappedClassNames.length) {
+                warn = true;
+                msg += '\n\nClass Name berikut tidak ada di kolom "Kelas" sheet Validation (Grade dikosongkan):\n- ' +
+                  res.unmappedClassNames.join('\n- ');
+              }
+              setStatus(msg, warn ? 'warn' : 'ok');
             })
             .withFailureHandler(function (err) {
               btn.disabled = false;
