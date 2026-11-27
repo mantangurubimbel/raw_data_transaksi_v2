@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 13px; margin: 12px; color: #202124; }
+      p { margin: 0 0 10px; }
+      input[type=file] { margin: 8px 0 14px; }
+      button { background: #1a73e8; color: #fff; border: 0; border-radius: 4px; padding: 8px 16px; cursor: pointer; }
+      button:disabled { background: #9aa0a6; cursor: default; }
+      #status { margin-top: 14px; white-space: pre-wrap; max-height: 170px; overflow: auto; }
+      .error { color: #d93025; }
+      .ok { color: #188038; }
+      .warn { color: #b06000; }
+    </style>
+  </head>
+  <body>
+    <p>Pilih file CSV transaksi. Seluruh data di <b>Raw Txn</b> (kolom A&ndash;R, baris 2 ke bawah)
+      akan <b>diganti</b> dengan isi file ini. Kolom formula di sebelah kanan tidak diubah.</p>
+    <input type="file" id="file" accept=".csv,text/csv">
+    <br>
+    <button id="btn" onclick="startUpload()">Upload</button>
+    <div id="status"></div>
+
+    <script>
+      var COLUMNS = <?!= JSON.stringify(columns) ?>;
+
+      function setStatus(msg, cls) {
+        var el = document.getElementById('status');
+        el.className = cls || '';
+        el.textContent = msg;
+      }
+
+      function startUpload() {
+        var file = document.getElementById('file').files[0];
+        if (!file) { setStatus('Pilih file CSV terlebih dahulu.', 'error'); return; }
+        var btn = document.getElementById('btn');
+        btn.disabled = true;
+        setStatus('Membaca file...');
+
+        var reader = new FileReader();
+        reader.onerror = function () { btn.disabled = false; setStatus('Gagal membaca file.', 'error'); };
+        reader.onload = function () {
+          var rows;
+          try {
+            rows = extractColumns(parseCsv(reader.result));
+          } catch (e) {
+            btn.disabled = false;
+            setStatus(e.message, 'error');
+            return;
+          }
+          setStatus('Memproses ' + rows.length.toLocaleString('id-ID') +
+            ' baris dan menulis ke Raw Txn...\nJangan tutup dialog ini.');
+          google.script.run
+            .withSuccessHandler(function (res) {
+              btn.disabled = false;
+              var msg = 'Selesai. ' + res.rows.toLocaleString('id-ID') + ' baris dari "' +
+                res.fileName + '" berhasil diupload ke Raw Txn.';
+              if (res.unmappedProductTypes.length) {
+                msg += '\n\nNew Product Type berikut tidak ada di sheet Validation (nilai asli dipertahankan):\n- ' +
+                  res.unmappedProductTypes.join('\n- ');
+                setStatus(msg, 'warn');
+              } else {
+                setStatus(msg, 'ok');
+              }
+            })
+            .withFailureHandler(function (err) {
+              btn.disabled = false;
+              setStatus((err && err.message) || String(err), 'error');
+            })
+            .importRawTxn(rows, file.name);
+        };
+        reader.readAsText(file, 'UTF-8');
+      }
+
+      /** Ambil hanya kolom yang dibutuhkan, dicocokkan berdasarkan nama header (case-insensitive). */
+      function extractColumns(table) {
+        if (table.length < 2) throw new Error('CSV tidak berisi data.');
+        var header = table[0].map(function (h) { return String(h).replace(/^﻿/, '').trim().toLowerCase(); });
+        var idx = [];
+        var missing = [];
+        COLUMNS.forEach(function (name) {
+          var i = header.indexOf(name.toLowerCase());
+          if (i < 0) missing.push(name);
+          idx.push(i);
+        });
+        if (missing.length) throw new Error('Kolom berikut tidak ditemukan di CSV:\n- ' + missing.join('\n- '));
+
+        var out = [];
+        for (var r = 1; r < table.length; r++) {
+          var row = table[r];
+          if (row.length === 1 && row[0] === '') continue; // baris kosong
+          var picked = [];
+          for (var c = 0; c < idx.length; c++) picked.push(row[idx[c]] === undefined ? '' : row[idx[c]]);
+          out.push(picked);
+        }
+        return out;
+      }
+
+      /** Parser CSV (RFC 4180): mendukung tanda kutip, koma & baris baru di dalam kutip. */
+      function parseCsv(text) {
+        var rows = [], row = [], field = '', i = 0, n = text.length, inQuotes = false;
+        while (i < n) {
+          var ch = text[i];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+              inQuotes = false; i++; continue;
+            }
+            field += ch; i++; continue;
+          }
+          if (ch === '"') { inQuotes = true; i++; continue; }
+          if (ch === ',') { row.push(field); field = ''; i++; continue; }
+          if (ch === '\r') { i++; continue; }
+          if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+          field += ch; i++;
+        }
+        if (field !== '' || row.length) { row.push(field); rows.push(row); }
+        return rows;
+      }
+    </script>
+  </body>
+</html>
